@@ -1,0 +1,59 @@
+name: Build macOS (OSS, unsigned)
+
+# Fork-only workflow: builds an Apple Silicon `oss` channel bundle without any
+# Warp signing credentials. The result is ad-hoc signed (`--selfsign`), so on the
+# target Mac run `xattr -cr WarpOss.app` once before opening it.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or SHA to build (defaults to the dispatched ref)
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: ./.github/actions/prepare_environment
+        with:
+          target_os: macos
+          is_self_hosted: "false"
+          cache_key: macos-oss-aarch64
+
+      - name: Install bundling tools
+        shell: bash
+        run: |
+          ./script/install_cargo_bundle
+          HOMEBREW_NO_AUTO_UPDATE=1 brew install create-dmg
+          xcodebuild -downloadComponent MetalToolchain || true
+
+      - name: Bundle (oss, aarch64, ad-hoc signed)
+        shell: bash
+        run: ./script/macos/bundle --channel oss --arch aarch64 --selfsign
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          mkdir -p dist
+          APP="$(find target -type d -name 'WarpOss.app' -print -quit)"
+          echo "app: $APP"
+          test -n "$APP"
+          ditto -c -k --keepParent "$APP" dist/WarpOss-aarch64.app.zip
+          find target -type f -name 'WarpOss*.dmg' -exec cp {} dist/ \; || true
+          ls -lh dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: warp-oss-macos-aarch64
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
