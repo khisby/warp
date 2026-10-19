@@ -35,6 +35,7 @@ jobs:
         with:
           target_os: macos
           is_self_hosted: "false"
+          install_release_deps: "true"
           cache_key: macos-oss-aarch64
 
       - name: Install bundling tools
