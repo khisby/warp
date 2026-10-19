@@ -4,6 +4,10 @@ name: Build macOS (OSS, unsigned)
 # Warp signing credentials. The result is ad-hoc signed (`--selfsign`), so on the
 # target Mac run `xattr -cr WarpOss.app` once before opening it.
 on:
+  # `push` is needed because workflow_dispatch only registers for workflows on the
+  # default branch, and the fork's master is kept as a pristine upstream mirror.
+  push:
+    branches: [local-session-sharing]
   workflow_dispatch:
     inputs:
       ref:
@@ -13,6 +17,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: build-macos-oss-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
